@@ -19,7 +19,9 @@ public = [
 ]
 private = [
 { cidr = "10.0.101.0/24", az = "us-east-1a" },
-{ cidr = "10.0.102.0/24", az = "us-east-1b" }
+{ cidr = "10.0.102.0/24", az = "us-east-1b" },
+{ cidr = "10.0.103.0/24", az = "us-east-1b" }
+
 ]
 }
 
