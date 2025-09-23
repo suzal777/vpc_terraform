@@ -25,8 +25,9 @@ variable "create_nat" {
 
 # Pick one subnet per AZ
 locals {
+  # Pick the first subnet per AZ
   public_subnet_per_az = {
-    for az, subnets in {for sn in var.public_subnets : sn.availability_zone => []} :
+    for az in distinct([for sn in var.public_subnets : sn.availability_zone]) :
     az => [for sn in var.public_subnets : sn if sn.availability_zone == az][0]
   }
 }
