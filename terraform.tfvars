@@ -33,4 +33,4 @@ private = [
 
 vpc_endpoints = ["s3", "dynamodb"]
 
-create_nat = true
+create_nat = false
