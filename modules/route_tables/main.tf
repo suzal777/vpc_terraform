@@ -28,17 +28,23 @@ resource "aws_route_table_association" "public" {
 
 
 # Private Route Table
-resource "aws_route_table" "private" {
-vpc_id = var.vpc_id
-
-
-route {
-cidr_block = "0.0.0.0/0"
-nat_gateway_id = var.nat_gateway_id
+variable "create_nat" {
+  type    = bool
+  default = false
 }
 
+resource "aws_route_table" "private" {
+  vpc_id = var.vpc_id
 
-tags = merge(var.tags, { Name = "private-rt" })
+  dynamic "route" {
+    for_each = var.create_nat && var.nat_gateway_id != null ? [var.nat_gateway_id] : []
+    content {
+      cidr_block     = "0.0.0.0/0"
+      nat_gateway_id = route.value
+    }
+  }
+
+  tags = merge(var.tags, { Name = "private-rt" })
 }
 
 

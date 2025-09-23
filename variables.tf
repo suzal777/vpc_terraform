@@ -20,3 +20,5 @@ variable "vpc_endpoints" {
 type = list(string)
 default = []
 }
+
+variable "create_nat" {}
