@@ -44,8 +44,8 @@ vpc_id = module.vpc.vpc_id
 igw_id = module.igw.igw_id
 nat_gateway_id  = module.nat.nat_id
 create_nat      = var.create_nat
-public_subnets = module.subnets.public_ids
-private_subnets = module.subnets.private_ids
+public_subnets  = module.subnets.public_subnets   # <-- updated
+private_subnets = module.subnets.private_subnets  # <-- updated
 tags = var.tags
 }
 

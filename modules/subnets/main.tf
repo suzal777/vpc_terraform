@@ -25,11 +25,21 @@ tags = merge(var.tags, { Name = "private-${each.value.az}" })
 }
 
 
-output "public_ids" {
-value = [for s in aws_subnet.public : s.id]
+output "public_subnets" {
+  value = [
+    for s in aws_subnet.public : {
+      id                = s.id
+      availability_zone = s.availability_zone
+    }
+  ]
 }
 
-
-output "private_ids" {
-value = [for s in aws_subnet.private : s.id]
+output "private_subnets" {
+  value = [
+    for s in aws_subnet.private : {
+      id                = s.id
+      availability_zone = s.availability_zone
+    }
+  ]
 }
+
