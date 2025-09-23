@@ -45,3 +45,7 @@ resource "aws_nat_gateway" "this" {
 output "nat_ids" {
   value = { for k, nat in aws_nat_gateway.this : k => nat.id }
 }
+
+output "nat_ids_by_az" {
+  value = { for i, nat in aws_nat_gateway.this : nat.availability_zone => nat.id }
+}

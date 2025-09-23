@@ -47,6 +47,17 @@ module "route_tables" {
   tags             = var.tags
 }
 
+module "route_tables" {
+  source           = "./modules/route_tables"
+  vpc_id           = module.vpc.vpc_id
+  igw_id           = module.igw.igw_id
+  nat_gateway_ids  = var.create_nat ? module.nat.nat_ids_by_az : {}
+  public_subnets   = module.subnets.public_subnets  # list of objects with id + AZ
+  private_subnets  = module.subnets.private_subnets # list of objects with id + AZ
+  tags             = var.tags
+}
+
+
 # module "endpoints" {
 # source = "./modules/vpc_endpoints"
 # vpc_id = module.vpc.vpc_id
