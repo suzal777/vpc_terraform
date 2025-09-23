@@ -1,5 +1,7 @@
 region = "us-east-1"
+
 vpc_name = "Sujal-VPC"
+
 vpc_cidr = "10.0.0.0/16"
 
 
@@ -29,8 +31,6 @@ private = [
 ]
 }
 
-
 vpc_endpoints = ["s3", "dynamodb"]
 
-
-create_nat = false
+create_nat = true
