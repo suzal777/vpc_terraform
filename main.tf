@@ -41,7 +41,7 @@ module "route_tables" {
 source = "./modules/route_tables"
 vpc_id = module.vpc.vpc_id
 igw_id = module.igw.igw_id
-nat_gateway_id = module.nat.nat_id
+nat_gateway_id  = var.create_nat ? module.nat.nat_id : null
 public_subnets = module.subnets.public_ids
 private_subnets = module.subnets.private_ids
 tags = var.tags
