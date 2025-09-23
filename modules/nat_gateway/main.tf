@@ -1,11 +1,14 @@
 variable "vpc_id" {
-  description = "VPC ID where NAT gateway will be created"
+  description = "VPC ID where NAT gateways will be created"
   type        = string
 }
 
-variable "public_subnet" {
-  description = "Public subnet ID where NAT gateway should be deployed"
-  type        = string
+variable "public_subnets" {
+  description = "List of public subnet objects with id and availability_zone"
+  type = list(object({
+    id                = string
+    availability_zone = string
+  }))
 }
 
 variable "tags" {
@@ -15,29 +18,30 @@ variable "tags" {
 }
 
 variable "create_nat" {
-  description = "Whether to create NAT Gateway and EIP"
+  description = "Whether to create NAT Gateways and EIPs"
   type        = bool
   default     = false
 }
 
-# Elastic IP for NAT
+# Elastic IP per AZ
 resource "aws_eip" "nat" {
-  count  = var.create_nat ? 1 : 0
+  for_each = var.create_nat ? { for sn in var.public_subnets : sn.availability_zone => sn } : {}
+
   domain = "vpc"
-
-  tags = merge(var.tags, { Name = "nat-eip" })
+  tags   = merge(var.tags, { Name = "nat-eip-${each.key}" })
 }
 
-# NAT Gateway
+# NAT Gateway per AZ
 resource "aws_nat_gateway" "this" {
-  count         = var.create_nat ? 1 : 0
-  allocation_id = var.create_nat ? aws_eip.nat[0].id : null
-  subnet_id     = var.public_subnet
+  for_each = var.create_nat ? { for sn in var.public_subnets : sn.availability_zone => sn } : {}
 
-  tags = merge(var.tags, { Name = "nat-gw" })
+  allocation_id = aws_eip.nat[each.key].id
+  subnet_id     = each.value.id
+
+  tags = merge(var.tags, { Name = "nat-gw-${each.key}" })
 }
 
-# Output NAT Gateway ID (null if not created)
-output "nat_id" {
-  value = var.create_nat ? aws_nat_gateway.this[0].id : null
+# Outputs (map of AZ → NAT ID)
+output "nat_ids" {
+  value = { for k, nat in aws_nat_gateway.this : k => nat.id }
 }

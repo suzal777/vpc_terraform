@@ -1,6 +1,10 @@
 variable "vpc_id" {}
 variable "igw_id" {}
-variable "nat_gateway_id" {}
+variable "nat_gateway_ids" {
+  description = "Map of AZ -> NAT Gateway ID"
+  type        = map(string)
+  default     = {}
+}
 variable "public_subnets" {
   description = "List of public subnet objects with id and availability_zone"
   type = list(object({
@@ -17,20 +21,12 @@ variable "private_subnets" {
 }
 variable "tags" { type = map(string) }
 
-variable "create_nat" {
-  type    = bool
-  default = false
-}
-
 # Public Route Tables (per AZ)
 resource "aws_route_table" "public" {
-  for_each = {
-    for s in var.public_subnets : s.availability_zone => s
-  }
+  for_each = { for s in var.public_subnets : s.availability_zone => s }
 
   vpc_id = var.vpc_id
-
-  tags = merge(var.tags, { Name = "public-rt-${each.key}" })
+  tags   = merge(var.tags, { Name = "public-rt-${each.key}" })
 }
 
 resource "aws_route" "public_igw" {
@@ -42,9 +38,7 @@ resource "aws_route" "public_igw" {
 }
 
 resource "aws_route_table_association" "public" {
-  for_each = {
-    for s in var.public_subnets : s.id => s.availability_zone
-  }
+  for_each = { for s in var.public_subnets : s.id => s.availability_zone }
 
   subnet_id      = each.key
   route_table_id = aws_route_table.public[each.value].id
@@ -52,27 +46,26 @@ resource "aws_route_table_association" "public" {
 
 # Private Route Tables (per AZ)
 resource "aws_route_table" "private" {
-  for_each = {
-    for s in var.private_subnets : s.availability_zone => s
-  }
+  for_each = { for s in var.private_subnets : s.availability_zone => s }
 
   vpc_id = var.vpc_id
-
-  tags = merge(var.tags, { Name = "private-rt-${each.key}" })
+  tags   = merge(var.tags, { Name = "private-rt-${each.key}" })
 }
 
+# NAT Routes (per AZ)
 resource "aws_route" "private_nat" {
-  for_each = var.create_nat && var.nat_gateway_id != null ? aws_route_table.private : {}
+  for_each = {
+    for az, rt in aws_route_table.private : az => rt
+    if contains(keys(var.nat_gateway_ids), az)
+  }
 
   route_table_id         = each.value.id
   destination_cidr_block = "0.0.0.0/0"
-  nat_gateway_id         = var.nat_gateway_id
+  nat_gateway_id         = var.nat_gateway_ids[each.key]
 }
 
 resource "aws_route_table_association" "private" {
-  for_each = {
-    for s in var.private_subnets : s.id => s.availability_zone
-  }
+  for_each = { for s in var.private_subnets : s.id => s.availability_zone }
 
   subnet_id      = each.key
   route_table_id = aws_route_table.private[each.value].id

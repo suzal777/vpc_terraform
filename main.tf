@@ -31,24 +31,21 @@ tags = var.tags
 module "nat" {
   source        = "./modules/nat_gateway"
   vpc_id        = module.vpc.vpc_id
-  public_subnet = module.subnets.public_ids[0]
+  public_subnets = module.subnets.public_subnets  
   create_nat    = var.create_nat   # toggle this in .tfvars to enable/disable NAT
   tags          = var.tags
 }
 
 
-
 module "route_tables" {
-source = "./modules/route_tables"
-vpc_id = module.vpc.vpc_id
-igw_id = module.igw.igw_id
-nat_gateway_id  = module.nat.nat_id
-create_nat      = var.create_nat
-public_subnets  = module.subnets.public_subnets   # <-- updated
-private_subnets = module.subnets.private_subnets  # <-- updated
-tags = var.tags
+  source           = "./modules/route_tables"
+  vpc_id           = module.vpc.vpc_id
+  igw_id           = module.igw.igw_id
+  nat_gateway_ids  = var.create_nat ? module.nat.nat_ids : {}
+  public_subnets   = module.subnets.public_subnets
+  private_subnets  = module.subnets.private_subnets
+  tags             = var.tags
 }
-
 
 # module "endpoints" {
 # source = "./modules/vpc_endpoints"
