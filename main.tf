@@ -28,13 +28,14 @@ tags = var.tags
 }
 
 
-# module "nat" {
-# source = "./modules/nat_gateway"
-# vpc_id = module.vpc.vpc_id
-# public_subnet = module.subnets.public_ids[0]
-# allocate_eip = true
-# tags = var.tags
-# }
+module "nat" {
+  source        = "./modules/nat_gateway"
+  vpc_id        = module.vpc.vpc_id
+  public_subnet = module.subnets.public_ids[0]
+  create_nat    = var.create_nat   # toggle this in .tfvars to enable/disable NAT
+  tags          = var.tags
+}
+
 
 
 module "route_tables" {

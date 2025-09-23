@@ -21,4 +21,7 @@ type = list(string)
 default = []
 }
 
-variable "create_nat" {}
+variable "create_nat" {
+  type    = bool
+  default = false
+}
