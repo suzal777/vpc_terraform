@@ -4,21 +4,21 @@ variable "vpc_cidr" {}
 
 
 variable "tags" {
-type = map(string)
+  type = map(string)
 }
 
 
 variable "subnets" {
-type = object({
-public = list(object({ cidr = string, az = string }))
-private = list(object({ cidr = string, az = string }))
-})
+  type = object({
+    public  = list(object({ cidr = string, az = string }))
+    private = list(object({ cidr = string, az = string }))
+  })
 }
 
 
 variable "vpc_endpoints" {
-type = list(string)
-default = []
+  type    = list(string)
+  default = []
 }
 
 variable "create_nat" {

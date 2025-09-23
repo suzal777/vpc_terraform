@@ -1,3 +1,7 @@
+#-----------------------------------------------------#
+#----------------VARIABLE SECTION---------------------#
+#-----------------------------------------------------#
+
 variable "vpc_id" {}
 variable "services" { type = list(string) }
 variable "subnets" {}
@@ -7,6 +11,10 @@ variable "region" {
   type        = string
   description = "AWS region"
 }
+
+#-----------------------------------------------------#
+#-----------------RESOURCE SECTION--------------------#
+#-----------------------------------------------------#
 
 resource "aws_vpc_endpoint" "this" {
   for_each = toset(var.services)
@@ -20,7 +28,10 @@ resource "aws_vpc_endpoint" "this" {
   tags = merge(var.tags, { Name = "endpoint-${each.value}" })
 }
 
+#-----------------------------------------------------#
+#------------------OUTPUTS SECTION--------------------#
+#-----------------------------------------------------#
 
 output "endpoint_ids" {
-value = { for k, v in aws_vpc_endpoint.this : k => v.id }
+  value = { for k, v in aws_vpc_endpoint.this : k => v.id }
 }

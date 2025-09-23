@@ -1,3 +1,7 @@
+#-----------------------------------------------------#
+#----------------VARIABLE SECTION---------------------#
+#-----------------------------------------------------#
+
 variable "vpc_id" {}
 variable "igw_id" {}
 variable "nat_gateway_ids" {
@@ -37,6 +41,10 @@ locals {
     az => [for s in var.private_subnets : s if s.availability_zone == az]
   }
 }
+
+#-----------------------------------------------------#
+#-----------------RESOURCE SECTION--------------------#
+#-----------------------------------------------------#
 
 # Public Route Tables (per AZ)
 resource "aws_route_table" "public" {
@@ -95,6 +103,10 @@ resource "aws_route_table_association" "private" {
   subnet_id      = each.value.id
   route_table_id = aws_route_table.private[each.value.availability_zone].id
 }
+
+#-----------------------------------------------------#
+#------------------OUTPUTS SECTION--------------------#
+#-----------------------------------------------------#
 
 # Outputs
 output "public_rt_ids" {

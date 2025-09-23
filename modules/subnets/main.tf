@@ -1,28 +1,39 @@
+#-----------------------------------------------------#
+#----------------VARIABLE SECTION---------------------#
+#-----------------------------------------------------#
+
 variable "vpc_id" {}
 variable "subnets" {}
 variable "tags" { type = map(string) }
 
+#-----------------------------------------------------#
+#-----------------RESOURCE SECTION--------------------#
+#-----------------------------------------------------#
 
 resource "aws_subnet" "public" {
-for_each = { for idx, sn in var.subnets.public : idx => sn }
-vpc_id = var.vpc_id
-cidr_block = each.value.cidr
-availability_zone = each.value.az
+  for_each          = { for idx, sn in var.subnets.public : idx => sn }
+  vpc_id            = var.vpc_id
+  cidr_block        = each.value.cidr
+  availability_zone = each.value.az
 
 
-tags = merge(var.tags, { Name = "public-${each.value.az}" })
+  tags = merge(var.tags, { Name = "public-${each.value.az}" })
 }
 
 
 resource "aws_subnet" "private" {
-for_each = { for idx, sn in var.subnets.private : idx => sn }
-vpc_id = var.vpc_id
-cidr_block = each.value.cidr
-availability_zone = each.value.az
+  for_each          = { for idx, sn in var.subnets.private : idx => sn }
+  vpc_id            = var.vpc_id
+  cidr_block        = each.value.cidr
+  availability_zone = each.value.az
 
 
-tags = merge(var.tags, { Name = "private-${each.value.az}" })
+  tags = merge(var.tags, { Name = "private-${each.value.az}" })
 }
+
+#-----------------------------------------------------#
+#------------------OUTPUTS SECTION--------------------#
+#-----------------------------------------------------#
 
 output "public_subnets" {
   value = [for s in aws_subnet.public : { id = s.id, availability_zone = s.availability_zone }]

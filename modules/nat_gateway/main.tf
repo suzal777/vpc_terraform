@@ -1,3 +1,7 @@
+#-----------------------------------------------------#
+#----------------VARIABLE SECTION---------------------#
+#-----------------------------------------------------#
+
 variable "vpc_id" {
   description = "VPC ID where NAT gateways will be created"
   type        = string
@@ -32,6 +36,10 @@ locals {
   }
 }
 
+#-----------------------------------------------------#
+#-----------------RESOURCE SECTION--------------------#
+#-----------------------------------------------------#
+
 # Elastic IP per AZ
 resource "aws_eip" "nat" {
   for_each = var.create_nat ? local.public_subnet_per_az : {}
@@ -49,6 +57,10 @@ resource "aws_nat_gateway" "this" {
 
   tags = merge(var.tags, { Name = "nat-gw-${each.key}" })
 }
+
+#-----------------------------------------------------#
+#------------------OUTPUTS SECTION--------------------#
+#-----------------------------------------------------#
 
 # Output: map of AZ -> NAT Gateway ID
 output "nat_ids_by_az" {
