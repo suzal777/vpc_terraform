@@ -36,15 +36,14 @@ variable "create_nat" {
 resource "aws_route_table" "private" {
   vpc_id = var.vpc_id
 
-  dynamic "route" {
-    for_each = var.create_nat && var.nat_gateway_id != null ? [var.nat_gateway_id] : []
-    content {
-      cidr_block     = "0.0.0.0/0"
-      nat_gateway_id = route.value
-    }
-  }
-
   tags = merge(var.tags, { Name = "private-rt" })
+}
+
+resource "aws_route" "private_nat_route" {
+  count                  = var.create_nat && var.nat_gateway_id != null ? 1 : 0
+  route_table_id         = aws_route_table.private.id
+  destination_cidr_block = "0.0.0.0/0"
+  nat_gateway_id         = var.nat_gateway_id
 }
 
 
