@@ -38,9 +38,7 @@ locals {
   }
 }
 
-# -----------------------------
 # Public Route Tables (per AZ)
-# -----------------------------
 resource "aws_route_table" "public" {
   for_each = local.public_subnets_by_az
 
@@ -59,16 +57,15 @@ resource "aws_route" "public_igw" {
 # Public route table associations (one per subnet)
 resource "aws_route_table_association" "public" {
   for_each = {
-    for s in flatten(values(local.public_subnets_by_az)) : s.id => s
+    for idx, subnet in var.public_subnets :
+    "${subnet.availability_zone}-${idx}" => subnet
   }
 
   subnet_id      = each.value.id
   route_table_id = aws_route_table.public[each.value.availability_zone].id
 }
 
-# -----------------------------
 # Private Route Tables (per AZ)
-# -----------------------------
 resource "aws_route_table" "private" {
   for_each = local.private_subnets_by_az
 
@@ -91,15 +88,15 @@ resource "aws_route" "private_nat" {
 # Private route table associations (one per subnet)
 resource "aws_route_table_association" "private" {
   for_each = {
-    for s in flatten(values(local.private_subnets_by_az)) : s.id => s
+    for idx, subnet in var.private_subnets :
+    "${subnet.availability_zone}-${idx}" => subnet
   }
 
   subnet_id      = each.value.id
   route_table_id = aws_route_table.private[each.value.availability_zone].id
 }
-# -----------------------------
+
 # Outputs
-# -----------------------------
 output "public_rt_ids" {
   value = { for k, rt in aws_route_table.public : k => rt.id }
 }
