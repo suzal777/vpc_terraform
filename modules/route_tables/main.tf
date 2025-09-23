@@ -25,8 +25,17 @@ variable "tags" {
 
 # Group subnets by AZ
 locals {
-  public_subnets_by_az  = groupby(var.public_subnets, "availability_zone")
-  private_subnets_by_az = groupby(var.private_subnets, "availability_zone")
+  # public subnets by AZ: map(az -> list of subnets)
+  public_subnets_by_az = {
+    for az in distinct([for s in var.public_subnets : s.availability_zone]) :
+    az => [for s in var.public_subnets : s if s.availability_zone == az]
+  }
+
+  # private subnets by AZ: map(az -> list of subnets)
+  private_subnets_by_az = {
+    for az in distinct([for s in var.private_subnets : s.availability_zone]) :
+    az => [for s in var.private_subnets : s if s.availability_zone == az]
+  }
 }
 
 # -----------------------------
