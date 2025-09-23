@@ -36,17 +36,6 @@ module "nat" {
   tags          = var.tags
 }
 
-
-module "route_tables" {
-  source           = "./modules/route_tables"
-  vpc_id           = module.vpc.vpc_id
-  igw_id           = module.igw.igw_id
-  nat_gateway_ids  = var.create_nat ? module.nat.nat_ids : {}
-  public_subnets   = module.subnets.public_subnets
-  private_subnets  = module.subnets.private_subnets
-  tags             = var.tags
-}
-
 module "route_tables" {
   source           = "./modules/route_tables"
   vpc_id           = module.vpc.vpc_id
