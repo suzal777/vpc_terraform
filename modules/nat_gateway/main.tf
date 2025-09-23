@@ -41,11 +41,7 @@ resource "aws_nat_gateway" "this" {
   tags = merge(var.tags, { Name = "nat-gw-${each.key}" })
 }
 
-# Outputs (map of AZ → NAT ID)
-output "nat_ids" {
-  value = { for k, nat in aws_nat_gateway.this : k => nat.id }
-}
-
+# Output: map of AZ -> NAT Gateway ID
 output "nat_ids_by_az" {
-  value = { for i, nat in aws_nat_gateway.this : nat.availability_zone => nat.id }
+  value = { for az, nat in aws_nat_gateway.this : az => nat.id }
 }
