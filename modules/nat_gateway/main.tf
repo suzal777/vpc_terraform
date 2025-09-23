@@ -23,9 +23,17 @@ variable "create_nat" {
   default     = false
 }
 
+# Pick one subnet per AZ
+locals {
+  public_subnet_per_az = {
+    for az, subnets in {for sn in var.public_subnets : sn.availability_zone => []} :
+    az => [for sn in var.public_subnets : sn if sn.availability_zone == az][0]
+  }
+}
+
 # Elastic IP per AZ
 resource "aws_eip" "nat" {
-  for_each = var.create_nat ? { for sn in var.public_subnets : sn.availability_zone => sn } : {}
+  for_each = var.create_nat ? local.public_subnet_per_az : {}
 
   domain = "vpc"
   tags   = merge(var.tags, { Name = "nat-eip-${each.key}" })
@@ -33,7 +41,7 @@ resource "aws_eip" "nat" {
 
 # NAT Gateway per AZ
 resource "aws_nat_gateway" "this" {
-  for_each = var.create_nat ? { for sn in var.public_subnets : sn.availability_zone => sn } : {}
+  for_each = var.create_nat ? local.public_subnet_per_az : {}
 
   allocation_id = aws_eip.nat[each.key].id
   subnet_id     = each.value.id
