@@ -51,6 +51,7 @@ tags = var.tags
 module "endpoints" {
 source = "./modules/vpc_endpoints"
 vpc_id = module.vpc.vpc_id
+region   = var.region
 services = var.vpc_endpoints
 subnets = module.subnets.private_ids
 tags = var.tags

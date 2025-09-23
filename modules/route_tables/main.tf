@@ -20,11 +20,10 @@ gateway_id = var.igw_id
 tags = merge(var.tags, { Name = "public-rt" })
 }
 
-
 resource "aws_route_table_association" "public" {
-for_each = toset(var.public_subnets)
-subnet_id = each.value
-route_table_id = aws_route_table.public.id
+  for_each = { for idx, subnet in var.public_subnets : "public-${idx}" => subnet }
+  subnet_id      = each.value
+  route_table_id = aws_route_table.public.id
 }
 
 
@@ -44,9 +43,9 @@ tags = merge(var.tags, { Name = "private-rt" })
 
 
 resource "aws_route_table_association" "private" {
-for_each = toset(var.private_subnets)
-subnet_id = each.value
-route_table_id = aws_route_table.private.id
+  for_each = { for idx, subnet in var.private_subnets : "private-${idx}" => subnet }
+  subnet_id      = each.value
+  route_table_id = aws_route_table.private.id
 }
 
 
