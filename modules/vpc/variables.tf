@@ -1,12 +1,8 @@
-variable "region" {}
-variable "vpc_name" {}
-variable "vpc_cidr" {}
-
-
+variable "name" {}
+variable "cidr_block" {}
 variable "tags" {
   type = map(string)
 }
-
 
 variable "subnets" {
   type = object({
@@ -21,7 +17,13 @@ variable "create_nat" {
 }
 
 variable "create_nat_instance" {
-  description = "Whether to create NAT Instances instead of Gateways"
-  type        = bool
-  default     = false
+  type    = bool
+  default = false
+}
+
+variable "iam_instance_profile" {}
+
+variable "nat_instance_sg_ids" {
+  description = "List of security group IDs for NAT instances"
+  type        = list(string)
 }

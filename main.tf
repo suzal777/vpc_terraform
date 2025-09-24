@@ -2,54 +2,39 @@ provider "aws" {
   region = var.region
 }
 
-
 module "vpc" {
-  source     = "./modules/vpc"
-  name       = var.vpc_name
-  cidr_block = var.vpc_cidr
-  tags       = var.tags
-}
-
-
-module "subnets" {
-  source  = "./modules/subnets"
-  vpc_id  = module.vpc.vpc_id
-  subnets = var.subnets
-  tags    = var.tags
-}
-
-
-module "igw" {
-  source = "./modules/igw"
-  vpc_id = module.vpc.vpc_id
-  tags   = var.tags
-}
-
-module "nat" {
-  source             = "./modules/nat_gateway"
-  vpc_id             = module.vpc.vpc_id
-  public_subnets     = module.subnets.public_subnets
-  create_nat         = var.create_nat  # toggle this in .tfvars to enable/disable NAT gateway
-  create_nat_instance = var.create_nat_instance
+  source             = "./modules/vpc"
+  name               = var.vpc_name
+  cidr_block         = var.vpc_cidr
   tags               = var.tags
+  subnets            = var.subnets
+  create_nat         = var.create_nat
+  create_nat_instance = var.create_nat_instance
+  iam_instance_profile = module.iam_nat.instance_profile
+  nat_instance_sg_ids = [module.nat_sg.sg_id]
+
 }
 
-module "route_tables" {
-  source            = "./modules/route_tables"
-  vpc_id            = module.vpc.vpc_id
-  igw_id            = module.igw.igw_id
-  nat_gateway_ids   = var.create_nat ? module.nat.nat_ids_by_az : {}
-  nat_instance_eni_ids  = var.create_nat_instance ? module.nat.nat_eni_ids_by_az : {}
-  public_subnets    = module.subnets.public_subnets
-  private_subnets   = module.subnets.private_subnets
-  tags              = var.tags
+module "iam_nat" {
+  source              = "./modules/iam"
+  name                = "vpc"
+  tags                = var.tags
+  create_nat_instance = var.create_nat_instance
 }
 
-# module "endpoints" {
-# source = "./modules/vpc_endpoints"
-# vpc_id = module.vpc.vpc_id
-# region   = var.region
-# services = var.vpc_endpoints
-# subnets = module.subnets.private_ids
-# tags = var.tags
-# }
+module "nat_sg" {
+  source = "./modules/security_group"
+  name   = "nat-instance-sg"
+  vpc_id = module.vpc.vpc_id
+  vpc_cidr = var.vpc_cidr
+  tags   = var.tags
+  
+  ingress_rules = [
+    {
+      from_port   = 0
+      to_port     = 0
+      protocol    = "-1"
+      cidr_blocks = [var.vpc_cidr]
+    }
+  ]
+}
