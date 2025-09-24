@@ -16,6 +16,7 @@ variable "nat_instance_ids" {
   default     = {}
 }
 
+
 variable "public_subnets" {
   description = "List of public subnet objects with id and availability_zone"
   type = list(object({
@@ -89,18 +90,28 @@ resource "aws_route_table" "private" {
 }
 
 # NAT Routes (per AZ) - use either Gateway or Instance
-resource "aws_route" "private_nat" {
+resource "aws_route" "private_nat_gateway" {
   for_each = {
     for az, rt in aws_route_table.private : az => rt
-    if contains(keys(var.nat_gateway_ids), az) || contains(keys(var.nat_instance_ids), az)
+    if contains(keys(var.nat_gateway_ids), az)
   }
 
   route_table_id         = each.value.id
   destination_cidr_block = "0.0.0.0/0"
-
-  nat_gateway_id = contains(keys(var.nat_gateway_ids), each.key) ? var.nat_gateway_ids[each.key] : null
-  instance_id    = contains(keys(var.nat_instance_ids), each.key) ? var.nat_instance_ids[each.key] : null
+  nat_gateway_id         = var.nat_gateway_ids[each.key]
 }
+
+resource "aws_route" "private_nat_instance" {
+  for_each = {
+    for az, rt in aws_route_table.private : az => rt
+    if contains(keys(var.nat_instance_ids), az)
+  }
+
+  route_table_id         = each.value.id
+  destination_cidr_block = "0.0.0.0/0"
+  instance_id            = var.nat_instance_ids[each.key]
+}
+
 
 # Private route table associations (one per subnet)
 resource "aws_route_table_association" "private" {
