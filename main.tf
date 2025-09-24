@@ -39,7 +39,7 @@ module "route_tables" {
   vpc_id            = module.vpc.vpc_id
   igw_id            = module.igw.igw_id
   nat_gateway_ids   = var.create_nat ? module.nat.nat_ids_by_az : {}
-  nat_instance_ids  = var.create_nat_instance ? module.nat_instance.nat_instance_ids_by_az : {}
+  nat_instance_ids  = var.create_nat_instance ? module.nat.nat_instance_ids_by_az : {}
   public_subnets    = module.subnets.public_subnets
   private_subnets   = module.subnets.private_subnets
   tags              = var.tags
