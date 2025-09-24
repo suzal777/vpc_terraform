@@ -25,3 +25,9 @@ variable "create_nat" {
   type    = bool
   default = false
 }
+
+variable "create_nat_instance" {
+  description = "Whether to create NAT Instances instead of Gateways"
+  type        = bool
+  default     = false
+}

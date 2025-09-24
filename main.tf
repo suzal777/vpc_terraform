@@ -25,23 +25,24 @@ module "igw" {
   tags   = var.tags
 }
 
-
 module "nat" {
-  source         = "./modules/nat_gateway"
-  vpc_id         = module.vpc.vpc_id
-  public_subnets = module.subnets.public_subnets
-  create_nat     = var.create_nat # toggle this in .tfvars to enable/disable NAT
-  tags           = var.tags
+  source             = "./modules/nat_gateway"
+  vpc_id             = module.vpc.vpc_id
+  public_subnets     = module.subnets.public_subnets
+  create_nat         = var.create_nat  # toggle this in .tfvars to enable/disable NAT gateway
+  create_nat_instance = var.create_nat_instance
+  tags               = var.tags
 }
 
 module "route_tables" {
-  source          = "./modules/route_tables"
-  vpc_id          = module.vpc.vpc_id
-  igw_id          = module.igw.igw_id
-  nat_gateway_ids = var.create_nat ? module.nat.nat_ids_by_az : {}
-  public_subnets  = module.subnets.public_subnets
-  private_subnets = module.subnets.private_subnets
-  tags            = var.tags
+  source           = "./modules/route_tables"
+  vpc_id           = module.vpc.vpc_id
+  igw_id           = module.igw.igw_id
+  nat_gateway_ids  = var.create_nat ? module.nat.nat_ids_by_az : {}
+  nat_instance_ids = var.create_nat_instance ? module.nat.nat_ids_by_az : {}
+  public_subnets   = module.subnets.public_subnets
+  private_subnets  = module.subnets.private_subnets
+  tags             = var.tags
 }
 
 
