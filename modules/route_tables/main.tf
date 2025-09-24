@@ -10,7 +10,7 @@ variable "nat_gateway_ids" {
   default     = {}
 }
 
-variable "nat_instance_ids" {
+variable "nat_instance_eni_ids" {
   description = "Map of AZ -> NAT Instance ID"
   type        = map(string)
   default     = {}
@@ -104,12 +104,12 @@ resource "aws_route" "private_nat_gateway" {
 resource "aws_route" "private_nat_instance" {
   for_each = {
     for az, rt in aws_route_table.private : az => rt
-    if contains(keys(var.nat_instance_ids), az)
+    if contains(keys(var.nat_instance_eni_ids), az)
   }
 
   route_table_id         = each.value.id
   destination_cidr_block = "0.0.0.0/0"
-  instance_id            = var.nat_instance_ids[each.key]
+  network_interface_id   = var.nat_instance_eni_ids[each.key]
 }
 
 

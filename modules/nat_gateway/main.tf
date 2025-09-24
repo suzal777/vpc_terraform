@@ -83,3 +83,9 @@ resource "aws_instance" "nat" {
 output "nat_ids_by_az" {
   value = var.create_nat ? { for az, nat in aws_nat_gateway.this : az => nat.id } : var.create_nat_instance ? { for az, inst in aws_instance.nat : az => inst.id } : {}
 }
+
+output "nat_eni_ids_by_az" {
+  value = {
+    for az, inst in aws_instance.nat : az => inst.primary_network_interface_id
+  }
+}
