@@ -32,4 +32,6 @@ subnets = {
 
 vpc_endpoints = ["s3", "dynamodb"]
 
-create_nat = true
+create_nat = false
+
+create_nat_instance = true
