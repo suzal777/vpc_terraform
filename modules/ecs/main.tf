@@ -104,6 +104,15 @@ data "aws_iam_policy_document" "ecs_task" {
   }
 }
 
+# Cloudwatch log group
+
+resource "aws_cloudwatch_log_group" "ecs_logs" {
+  for_each          = { for s in var.services : s.name => s }
+  name              = "/ecs/${each.key}"
+  retention_in_days = 7
+  tags              = var.tags
+}
+
 # ECS Task Definitions
 resource "aws_ecs_task_definition" "task_definition" {
   for_each                 = { for s in var.services : s.name => s }
@@ -125,10 +134,19 @@ resource "aws_ecs_task_definition" "task_definition" {
       portMappings = [
         {
           containerPort = each.value.container_port
-          hostPort      = each.value.host_port
+          hostPort      = var.launch_type == "FARGATE" ? each.value.container_port : each.value.host_port
           name          = "http"
         }
       ]
+
+       logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          awslogs-group         = aws_cloudwatch_log_group.ecs_logs[each.key].name
+          awslogs-region        = var.region
+          awslogs-stream-prefix = each.key
+        }
+      }
 
       # environment = [
       #   for key, value in lookup(each.value, "environment", {}) :
@@ -279,7 +297,7 @@ resource "aws_ecs_service" "ecs_service" {
     namespace = aws_service_discovery_private_dns_namespace.service_connect_namespace[0].arn
 
     dynamic "service" {
-      for_each = can(regex("backend", each.value.name)) ? [1] : []
+      for_each = can(regex("backend", each.value.name)) ? [1] : []           # Hardcoded alert
       content {
         discovery_name = "${each.key}-svc"
         port_name      = "http"
@@ -294,7 +312,8 @@ resource "aws_ecs_service" "ecs_service" {
 
   depends_on = [
     null_resource.push_service_images,
-    aws_lb.main,                               # Ensure ALB is ready
+    aws_lb.main,
+    aws_ecs_service.ecs_service["backend"]           # Hardcoded alert
   ]
 
   tags       = var.tags

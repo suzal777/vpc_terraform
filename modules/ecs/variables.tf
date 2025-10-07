@@ -53,7 +53,7 @@ variable "sg_ids" {
 
 variable "instance_type" {
   type    = string
-  default = "t3.micro"
+  default = "t3.small"
 }
 
 variable "asg_min_size" {

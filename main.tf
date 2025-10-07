@@ -51,6 +51,13 @@ module "nat_sg" {
       cidr_blocks = ["0.0.0.0/0"]
     },
     {
+      description = "Allow ECS internal communication"
+      from_port   = 0
+      to_port     = 65535
+      protocol    = "tcp"
+      cidr_blocks = [var.vpc_cidr]
+    },
+    {
       description = "Allow HTTPS from anywhere"
       from_port   = 443
       to_port     = 443
@@ -88,7 +95,7 @@ module "ecs" {
       name                   = "frontend"
       task_image             = "suzal777/ecs-frontend:1.0.4"
       task_cpu               = 256
-      task_memory            = 256
+      task_memory            = 512
       desired_count          = 1
       enable_service_connect = true
       enable_load_balancer   = true
@@ -100,7 +107,7 @@ module "ecs" {
       name                   = "backend"
       task_image             = "suzal777/ecs-backend:1.0.2"
       task_cpu               = 256
-      task_memory            = 256
+      task_memory            = 512
       desired_count          = 1
       enable_service_connect = true
       enable_load_balancer   = false
