@@ -25,3 +25,5 @@ variable "create_nat_instance" {
   type        = bool
   default     = false
 }
+
+variable "ecr_name" {}

@@ -71,7 +71,7 @@ resource "aws_instance" "nat" {
   iam_instance_profile = var.iam_instance_profile
   vpc_security_group_ids = var.nat_instance_sg_ids
 
-  tags = merge(var.tags, { Name = "${var.name}-nat-instance-${each.key}" })
+  tags = merge(var.tags, { Name = "${var.name}-nat-instance" })
 }
 
 #-----------------Route Tables-----------------------#
