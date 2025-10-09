@@ -32,6 +32,7 @@ variable "services" {
     host_port              = number
     environment            = optional(map(string))
     path_pattern           = optional(string)
+    health_check_path      = string
   }))
   description = "List of ECS services to deploy"
 }
@@ -47,13 +48,16 @@ variable "private_subnet_ids" {
 }
 
 variable "sg_ids" {
-  type        = list(string)
-  description = "Security group IDs from your SG module"
+  type = object({
+    alb_sg = list(string)
+    ec2_sg = list(string)
+    ecs_sg = list(string)
+  })
 }
 
 variable "instance_type" {
   type    = string
-  default = "t3.small"
+  default = "t3.medium"
 }
 
 variable "asg_min_size" {
@@ -91,7 +95,7 @@ variable "service_connect_namespace_name" {
   default = "service-connect.local"
 }
 
-variable "network_mode" {
-  type = string
-  default = "awsvpc"
+variable "enable_fargate_spot" {
+  type   = string
+  default = "false"
 }

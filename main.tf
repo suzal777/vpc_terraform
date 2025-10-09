@@ -43,20 +43,6 @@ module "nat_sg" {
       protocol    = "tcp"
       cidr_blocks = ["0.0.0.0/0"]
     },
-      {
-      description = "Allow 8080 from anywhere"
-      from_port   = 8080
-      to_port     = 8080
-      protocol    = "tcp"
-      cidr_blocks = ["0.0.0.0/0"]
-    },
-    {
-      description = "Allow ECS internal communication"
-      from_port   = 0
-      to_port     = 65535
-      protocol    = "tcp"
-      cidr_blocks = [var.vpc_cidr]
-    },
     {
       description = "Allow HTTPS from anywhere"
       from_port   = 443
@@ -74,6 +60,99 @@ module "nat_sg" {
   ]
 }
 
+module "alb_sg" {
+  source = "./modules/security_group"
+  name   = "alb-sg"
+  vpc_id = module.vpc.vpc_id
+  vpc_cidr = var.vpc_cidr
+  tags   = var.tags
+  
+  ingress_rules = [
+    {
+      from_port   = 0
+      to_port     = 0
+      protocol    = "-1"
+      cidr_blocks = [var.vpc_cidr]
+    },
+    {
+      description = "Allow HTTP from anywhere"
+      from_port   = 80
+      to_port     = 80
+      protocol    = "tcp"
+      cidr_blocks = ["0.0.0.0/0"]
+    },
+    {
+      description = "Allow HTTPS from anywhere"
+      from_port   = 443
+      to_port     = 443
+      protocol    = "tcp"
+      cidr_blocks = ["0.0.0.0/0"]
+    }
+  ]
+}
+
+module "ec2_sg" {
+  source = "./modules/security_group"
+  name   = "ec2-sg"
+  vpc_id = module.vpc.vpc_id
+  vpc_cidr = var.vpc_cidr
+  tags   = var.tags
+  
+  ingress_rules = [
+    {
+      from_port   = 0
+      to_port     = 0
+      protocol    = "-1"
+      cidr_blocks = [var.vpc_cidr]
+    },
+    {
+      description = "Allow HTTP from anywhere"
+      from_port   = 80
+      to_port     = 80
+      protocol    = "tcp"
+      cidr_blocks = ["0.0.0.0/0"]
+    },
+    {
+      description = "Allow 8080 from anywhere"
+      from_port   = 8080
+      to_port     = 8080
+      protocol    = "tcp"
+      cidr_blocks = ["0.0.0.0/0"]
+    }
+  ]
+}
+
+module "ecs_sg" {
+  source = "./modules/security_group"
+  name   = "ecs-sg"
+  vpc_id = module.vpc.vpc_id
+  vpc_cidr = var.vpc_cidr
+  tags   = var.tags
+  
+  ingress_rules = [
+    {
+      from_port   = 0
+      to_port     = 0
+      protocol    = "-1"
+      cidr_blocks = [var.vpc_cidr]
+    },
+    {
+      description = "Allow HTTP from anywhere"
+      from_port   = 80
+      to_port     = 80
+      protocol    = "tcp"
+      cidr_blocks = ["0.0.0.0/0"]
+    },
+    {
+      description = "Allow 8080 from anywhere"
+      from_port   = 8080
+      to_port     = 8080
+      protocol    = "tcp"
+      cidr_blocks = ["0.0.0.0/0"]
+    }
+  ]
+}
+
 module "ecs" {
   source      = "./modules/ecs"
 
@@ -82,26 +161,31 @@ module "ecs" {
   vpc_id       = module.vpc.vpc_id
   subnet_ids   = [for s in module.vpc.public_subnets : s.id]
   private_subnet_ids   = [for s in module.vpc.private_subnets : s.id]
-  sg_ids       = [module.nat_sg.sg_id]
+  sg_ids = {
+  alb_sg = [module.alb_sg.sg_id]
+  ec2_sg = [module.ec2_sg.sg_id]
+  ecs_sg = [module.ecs_sg.sg_id]
+  }
   tags        = var.tags
   launch_type = "EC2"  # "EC2" or "FARGATE"
+  enable_fargate_spot = true
 
-  # Required
-  image_id = "ami-036428f37186903ce"  # Only used for EC2, still required
+  image_id = "ami-036428f37186903ce"  # Only used for EC2
   
 
   services = [
     {
       name                   = "frontend"
-      task_image             = "suzal777/ecs-frontend:1.0.4"
+      task_image             = "suzal777/ecs-frontend:1.0.5"
       task_cpu               = 256
       task_memory            = 512
       desired_count          = 1
-      enable_service_connect = true
+      enable_service_connect = false
       enable_load_balancer   = true
       container_port         = 80
       host_port              = 80
       path_pattern           = "/*"
+      health_check_path      = "/"
     },
     {
       name                   = "backend"
@@ -109,10 +193,12 @@ module "ecs" {
       task_cpu               = 256
       task_memory            = 512
       desired_count          = 1
-      enable_service_connect = true
-      enable_load_balancer   = false
+      enable_service_connect = false
+      enable_load_balancer   = true
       container_port         = 8080
       host_port              = 8080
+      path_pattern           = "/backend"
+      health_check_path      = "/backend"
     }
   ]
 }

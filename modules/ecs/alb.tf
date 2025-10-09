@@ -3,7 +3,7 @@ resource "aws_lb" "main" {
   name               = "${var.name}-alb"
   load_balancer_type = "application"
   subnets            = var.subnet_ids
-  security_groups    = var.sg_ids
+  security_groups    = var.sg_ids.alb_sg
   tags               = var.tags
 }
 
@@ -12,13 +12,13 @@ resource "aws_lb_target_group" "tg" {
   for_each = { for s in var.services : s.name => s if s.enable_load_balancer }
 
   name     = "${each.key}-tg"
-  port     = 80
+  port     = each.value.container_port
   protocol = "HTTP"
   vpc_id   = var.vpc_id
   target_type = var.launch_type == "FARGATE" ? "ip" : "instance"
 
   health_check {
-    path = "/"
+    path = each.value.health_check_path
   }
 
   tags = var.tags
@@ -45,7 +45,7 @@ resource "aws_lb_listener_rule" "path_based" {
   for_each = { for s in var.services : s.name => s if s.enable_load_balancer }
 
   listener_arn = aws_lb_listener.http.arn
-  priority     = 100 + index(var.services[*].name, each.key)
+  priority     = 100 - index(var.services[*].name, each.key)
 
   action {
     type             = "forward"

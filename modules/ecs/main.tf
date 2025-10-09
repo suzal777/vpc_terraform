@@ -19,91 +19,6 @@ resource "aws_service_discovery_private_dns_namespace" "service_connect_namespac
   vpc         = var.vpc_id
 }
 
-# ECR Repos + Push
-resource "aws_ecr_repository" "service_repo" {
-  for_each     = { for s in var.services : s.name => s }
-  name         = "${each.key}-repo"
-  force_delete = true
-  tags         = var.tags
-}
-
-resource "null_resource" "push_service_images" {
-  for_each = { for s in var.services : s.name => s }
-  depends_on = [aws_ecr_repository.service_repo]
-
-  provisioner "local-exec" {
-    command = <<EOT
-aws ecr get-login-password --region ${var.region} | docker login --username AWS --password-stdin ${aws_ecr_repository.service_repo[each.key].repository_url}
-docker pull ${each.value.task_image}
-docker tag ${each.value.task_image} ${aws_ecr_repository.service_repo[each.key].repository_url}:latest
-docker push ${aws_ecr_repository.service_repo[each.key].repository_url}:latest
-EOT
-  }
-}
-
-# IAM Roles for Tasks (shared)
-resource "aws_iam_role" "ecs_task_exec" {
-  name               = "ecs-task-exec-role"
-  assume_role_policy = data.aws_iam_policy_document.ecs_task_exec.json
-}
-
-data "aws_iam_policy_document" "ecs_task_exec" {
-  statement {
-    actions = ["sts:AssumeRole"]
-    principals {
-      type        = "Service"
-      identifiers = ["ecs-tasks.amazonaws.com"]
-    }
-  }
-}
-
-resource "aws_iam_role_policy_attachment" "ecs_task_exec" {
-  role       = aws_iam_role.ecs_task_exec.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
-}
-
-resource "aws_iam_role_policy_attachment" "ecs_task_exec_ssm_managed" {
-  role       = aws_iam_role.ecs_task_exec.name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
-}
-
-# Attach additional ECS Exec permissions
-resource "aws_iam_role_policy" "ecs_task_exec_ssm" {
-  name = "ecs-task-exec-ssm"
-  role = aws_iam_role.ecs_task_exec.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "ssmmessages:CreateControlChannel",
-          "ssmmessages:CreateDataChannel",
-          "ssmmessages:OpenControlChannel",
-          "ssmmessages:OpenDataChannel"
-        ]
-        Resource = "*"
-      }
-    ]
-  })
-}
-
-resource "aws_iam_role" "ecs_task" {
-  name               = "ecs-task-role"
-  assume_role_policy = data.aws_iam_policy_document.ecs_task.json
-}
-
-data "aws_iam_policy_document" "ecs_task" {
-  statement {
-    actions = ["sts:AssumeRole"]
-    principals {
-      type        = "Service"
-      identifiers = ["ecs-tasks.amazonaws.com"]
-    }
-  }
-}
-
 # Cloudwatch log group
 
 resource "aws_cloudwatch_log_group" "ecs_logs" {
@@ -176,7 +91,7 @@ resource "aws_launch_template" "ecs" {
 
   network_interfaces {
     associate_public_ip_address = true
-    security_groups             = var.sg_ids
+    security_groups             = var.sg_ids.ec2_sg
   }
 
   user_data = base64encode(<<EOF
@@ -188,7 +103,7 @@ EOF
 }
 
 resource "aws_iam_role" "ecs_instance" {
-  name               = "ecs-instance-role"
+  name               = "ecs-ec2-instance-role"
   assume_role_policy = data.aws_iam_policy_document.ecs_instance.json
 }
 
@@ -208,7 +123,7 @@ resource "aws_iam_role_policy_attachment" "ecs_instance" {
 }
 
 resource "aws_iam_instance_profile" "ecs" {
-  name = "ecs-instance-profile"
+  name = "ecs-ec2-instance-profile"
   role = aws_iam_role.ecs_instance.name
 }
 
@@ -248,19 +163,17 @@ resource "aws_ecs_capacity_provider" "asg" {
   tags = var.tags
 }
 
+# ECS Cluster Capacity Providers
 resource "aws_ecs_cluster_capacity_providers" "capacity_providers" {
-  count = var.launch_type == "EC2" ? 1 : 0
 
-  cluster_name       = aws_ecs_cluster.ecs_cluster.name
-  capacity_providers = [aws_ecs_capacity_provider.asg[0].name]
+  cluster_name = aws_ecs_cluster.ecs_cluster.name
 
-  default_capacity_provider_strategy {
-    capacity_provider = aws_ecs_capacity_provider.asg[0].name
-    weight            = 1
-  }
+  # Choose capacity providers dynamically based on launch type and variable
+  capacity_providers = var.launch_type == "EC2" ? [aws_ecs_capacity_provider.asg[0].name] : (var.enable_fargate_spot ? ["FARGATE", "FARGATE_SPOT"] : ["FARGATE"])
 
   depends_on = [aws_ecs_capacity_provider.asg]
 }
+
 
 # ECS Services (EC2 or Fargate) with Service Connect
 resource "aws_ecs_service" "ecs_service" {
@@ -276,8 +189,8 @@ resource "aws_ecs_service" "ecs_service" {
     for_each = var.launch_type == "FARGATE" ? [1] : []
     content {
       subnets         = var.private_subnet_ids
-      security_groups = var.sg_ids
-      assign_public_ip = true
+      security_groups = var.sg_ids.ecs_sg
+      assign_public_ip = false
     }
   }
 
@@ -286,7 +199,7 @@ resource "aws_ecs_service" "ecs_service" {
   content {
     target_group_arn = aws_lb_target_group.tg[each.key].arn
     container_name   = each.key
-    container_port   = 80
+    container_port   = each.value.container_port
   }
 }
 
