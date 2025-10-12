@@ -1,6 +1,6 @@
 # ECS Cluster
 resource "aws_ecs_cluster" "ecs_cluster" {
-  name = coalesce(var.cluster_name, var.name)
+  name = coalesce(var.cluster_name, "${var.name}-ecs-cluster")
 
   configuration {
       execute_command_configuration {
@@ -23,7 +23,7 @@ resource "aws_service_discovery_private_dns_namespace" "service_connect_namespac
 
 resource "aws_cloudwatch_log_group" "ecs_logs" {
   for_each          = { for s in var.services : s.name => s }
-  name              = "/ecs/${each.key}"
+  name              = "/${var.name}-ecs/${each.key}"
   retention_in_days = 7
   tags              = var.tags
 }
@@ -31,7 +31,7 @@ resource "aws_cloudwatch_log_group" "ecs_logs" {
 # ECS Task Definitions
 resource "aws_ecs_task_definition" "task_definition" {
   for_each                 = { for s in var.services : s.name => s }
-  family                   = "${each.key}-task"
+  family                   = "${var.name}-${each.key}-task"
   network_mode             = var.launch_type == "FARGATE" ? "awsvpc" : "bridge"
   requires_compatibilities = var.launch_type == "FARGATE" ? ["FARGATE"] : ["EC2"]
   cpu                      = each.value.task_cpu
@@ -42,7 +42,7 @@ resource "aws_ecs_task_definition" "task_definition" {
   container_definitions = jsonencode([
     {
       name      = each.key
-      image     = "${aws_ecr_repository.service_repo[each.key].repository_url}:latest"
+      image     = "${var.repository_urls[each.key]}:latest"
       cpu       = each.value.task_cpu
       memory    = each.value.task_memory
       essential = true
@@ -91,7 +91,7 @@ resource "aws_launch_template" "ecs" {
 
   network_interfaces {
     associate_public_ip_address = true
-    security_groups             = var.sg_ids.ec2_sg
+    security_groups             = var.sg_ids.ecs_sg
   }
 
   user_data = base64encode(<<EOF
@@ -103,7 +103,7 @@ EOF
 }
 
 resource "aws_iam_role" "ecs_instance" {
-  name               = "ecs-ec2-instance-role"
+  name               = "${var.name}-ecs-instance-role"
   assume_role_policy = data.aws_iam_policy_document.ecs_instance.json
 }
 
@@ -123,12 +123,12 @@ resource "aws_iam_role_policy_attachment" "ecs_instance" {
 }
 
 resource "aws_iam_instance_profile" "ecs" {
-  name = "ecs-ec2-instance-profile"
+  name = "${var.name}-ecs-instance-profile"
   role = aws_iam_role.ecs_instance.name
 }
 
 resource "aws_autoscaling_group" "ecs" {
-  name = "${var.name}-asg"
+  name = "${var.name}-ecs-asg"
   count               = var.launch_type == "EC2" ? 1 : 0
   desired_capacity    = var.asg_desired_capacity
   max_size            = var.asg_max_size
@@ -147,7 +147,7 @@ resource "aws_autoscaling_group" "ecs" {
 resource "aws_ecs_capacity_provider" "asg" {
   count = var.launch_type == "EC2" ? 1 : 0
 
-  name = "${var.name}-capacity-provider"
+  name = "${var.name}-ecs-capacity-provider"
 
   auto_scaling_group_provider {
     auto_scaling_group_arn         = aws_autoscaling_group.ecs[0].arn
@@ -157,7 +157,7 @@ resource "aws_ecs_capacity_provider" "asg" {
       status                    = "ENABLED"
       target_capacity           = 80
       minimum_scaling_step_size = 1
-      maximum_scaling_step_size = 10
+      maximum_scaling_step_size = 2
     }
   }
   tags = var.tags
@@ -178,7 +178,7 @@ resource "aws_ecs_cluster_capacity_providers" "capacity_providers" {
 # ECS Services (EC2 or Fargate) with Service Connect
 resource "aws_ecs_service" "ecs_service" {
   for_each        = { for s in var.services : s.name => s }
-  name            = "${each.key}-service"
+  name            = "${var.name}-${each.key}-service"
   cluster         = aws_ecs_cluster.ecs_cluster.id
   task_definition = aws_ecs_task_definition.task_definition[each.key].arn
   desired_count   = each.value.desired_count
@@ -210,7 +210,7 @@ resource "aws_ecs_service" "ecs_service" {
     namespace = aws_service_discovery_private_dns_namespace.service_connect_namespace[0].arn
 
     dynamic "service" {
-      for_each = can(regex("backend", each.value.name)) ? [1] : []           # Hardcoded alert
+      for_each = can(regex("backend", each.value.name)) ? [1] : []           # Hardcoded alert, checks if the service needs client and server
       content {
         discovery_name = "${each.key}-svc"
         port_name      = "http"
@@ -224,9 +224,8 @@ resource "aws_ecs_service" "ecs_service" {
 }
 
   depends_on = [
-    null_resource.push_service_images,
     aws_lb.main,
-    aws_ecs_service.ecs_service["backend"]           # Hardcoded alert
+    aws_ecs_service.ecs_service["backend"]           # Hardcoded alert, checks if the service needs client and server
   ]
 
   tags       = var.tags

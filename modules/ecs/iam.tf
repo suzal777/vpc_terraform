@@ -1,6 +1,6 @@
 # IAM Roles for Tasks (shared)
 resource "aws_iam_role" "ecs_task_exec" {
-  name               = "ecs-task-exec-role"
+  name               = "${var.name}-ecs-task-exec-role"
   assume_role_policy = data.aws_iam_policy_document.ecs_task_exec.json
 }
 
@@ -26,7 +26,7 @@ resource "aws_iam_role_policy_attachment" "ecs_task_exec_ssm_managed" {
 
 # Attach additional ECS Exec permissions
 resource "aws_iam_role_policy" "ecs_task_exec_ssm" {
-  name = "ecs-task-exec-ssm"
+  name = "${var.name}-ecs-task-exec-ssm"
   role = aws_iam_role.ecs_task_exec.id
 
   policy = jsonencode({
@@ -47,7 +47,7 @@ resource "aws_iam_role_policy" "ecs_task_exec_ssm" {
 }
 
 resource "aws_iam_role" "ecs_task" {
-  name               = "ecs-task-role"
+  name               = "${var.name}-ecs-task-role"
   assume_role_policy = data.aws_iam_policy_document.ecs_task.json
 }
 

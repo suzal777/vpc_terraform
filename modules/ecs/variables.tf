@@ -47,10 +47,9 @@ variable "private_subnet_ids" {
   description = "Private Subnets for ECS tasks"
 }
 
-variable "sg_ids" {
+ variable "sg_ids" {
   type = object({
     alb_sg = list(string)
-    ec2_sg = list(string)
     ecs_sg = list(string)
   })
 }
@@ -98,4 +97,9 @@ variable "service_connect_namespace_name" {
 variable "enable_fargate_spot" {
   type   = string
   default = "false"
+}
+
+variable "repository_urls" {
+  description = "Map of ECR repository URLs for each service"
+  type        = map(string)
 }
