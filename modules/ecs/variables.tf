@@ -8,6 +8,10 @@ variable "region" {
   default     = "us-east-1"
 }
 
+variable "vpc_cidr" {
+  type = string
+}
+
 variable "cluster_name" {
   type        = string
   default     = null
@@ -47,13 +51,6 @@ variable "private_subnet_ids" {
   description = "Private Subnets for ECS tasks"
 }
 
- variable "sg_ids" {
-  type = object({
-    alb_sg = list(string)
-    ecs_sg = list(string)
-  })
-}
-
 variable "instance_type" {
   type    = string
   default = "t3.medium"
@@ -66,7 +63,7 @@ variable "asg_min_size" {
 
 variable "asg_max_size" {
   type    = number
-  default = 2
+  default = 1
 }
 
 variable "asg_desired_capacity" {
@@ -77,11 +74,6 @@ variable "asg_desired_capacity" {
 variable "tags" {
   type    = map(string)
   default = {}
-}
-
-variable "image_id" {
-  type = string
-  description = "AMI ID for EC2 launch type"
 }
 
 variable "vpc_id" {

@@ -77,13 +77,26 @@ resource "aws_ecs_task_definition" "task_definition" {
 }
 
 # EC2 Launch Template + ASG + Capacity Provider (shared)
+
+# ECS-optimized AMI
+data "aws_ami" "ecs" {
+  count       = var.launch_type == "EC2" ? 1 : 0
+  most_recent = true
+  owners      = ["amazon"]
+
+  filter {
+    name   = "name"
+    values = ["amzn2-ami-ecs-hvm-*-x86_64-ebs"]
+  }
+}
+
 resource "aws_launch_template" "ecs" {
   count = var.launch_type == "EC2" ? 1 : 0
 
   name_prefix   = "ecs-"
-  image_id      = var.image_id
+  image_id      = data.aws_ami.ecs[0].id
   instance_type = var.instance_type
-  key_name      = "sujal-key"
+  key_name      = "Sujals-key"
 
   iam_instance_profile {
     name = aws_iam_instance_profile.ecs.name
@@ -91,7 +104,7 @@ resource "aws_launch_template" "ecs" {
 
   network_interfaces {
     associate_public_ip_address = true
-    security_groups             = var.sg_ids.ecs_sg
+    security_groups             = [aws_security_group.ecs_sg.id]
   }
 
   user_data = base64encode(<<EOF
@@ -100,31 +113,6 @@ echo "ECS_CLUSTER=${aws_ecs_cluster.ecs_cluster.name}" >> /etc/ecs/ecs.config
 echo 'ECS_AVAILABLE_LOGGING_DRIVERS=["awslogs","json-file"]' >> /etc/ecs/ecs.config
 EOF
   )
-}
-
-resource "aws_iam_role" "ecs_instance" {
-  name               = "${var.name}-ecs-instance-role"
-  assume_role_policy = data.aws_iam_policy_document.ecs_instance.json
-}
-
-data "aws_iam_policy_document" "ecs_instance" {
-  statement {
-    actions = ["sts:AssumeRole"]
-    principals {
-      type        = "Service"
-      identifiers = ["ec2.amazonaws.com"]
-    }
-  }
-}
-
-resource "aws_iam_role_policy_attachment" "ecs_instance" {
-  role       = aws_iam_role.ecs_instance.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role"
-}
-
-resource "aws_iam_instance_profile" "ecs" {
-  name = "${var.name}-ecs-instance-profile"
-  role = aws_iam_role.ecs_instance.name
 }
 
 resource "aws_autoscaling_group" "ecs" {
@@ -189,7 +177,7 @@ resource "aws_ecs_service" "ecs_service" {
     for_each = var.launch_type == "FARGATE" ? [1] : []
     content {
       subnets         = var.private_subnet_ids
-      security_groups = var.sg_ids.ecs_sg
+      security_groups = [aws_security_group.ecs_sg.id]
       assign_public_ip = false
     }
   }

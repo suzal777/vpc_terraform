@@ -63,15 +63,15 @@ resource "aws_nat_gateway" "nat_gateway" {
 resource "aws_instance" "nat" {
   for_each = var.create_nat_instance ? local.public_subnet_per_az : {}
 
-  ami                         = "ami-024cf76afbc833688" # NAT AMI
+  ami                         = "ami-024cf76afbc833688"
   instance_type               = "t3.micro"
   subnet_id                   = each.value.id
   associate_public_ip_address = true
   source_dest_check           = false
-  iam_instance_profile = var.iam_instance_profile
-  vpc_security_group_ids = var.nat_instance_sg_ids
+  iam_instance_profile        = aws_iam_instance_profile.nat_instance_profile["main"].name
+  vpc_security_group_ids      = [aws_security_group.nat_sg.id]
 
-  tags = merge(var.tags, { Name = "${var.name}-nat-instance" })
+  tags = merge(var.tags, { Name = "${var.name}-nat-instance-${each.key}" })
 }
 
 #-----------------Route Tables-----------------------#
@@ -129,4 +129,42 @@ resource "aws_route_table_association" "private" {
   route_table_id = aws_route_table.private[each.value.availability_zone].id
 }
 
+# NAT Instance SG
+resource "aws_security_group" "nat_sg" {
+  name_prefix = "${var.name}-nat-sg-" 
+  description = "Security group for NAT instance"
+  vpc_id      = aws_vpc.vpc.id
+  
+  ingress {
+      from_port   = 0
+      to_port     = 0
+      protocol    = "-1"
+      cidr_blocks = [var.cidr_block]
+  }
 
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # Allow all outbound
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = merge(var.tags, {
+    Name = "${var.name}-ecs-sg"
+  })
+}

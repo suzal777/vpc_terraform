@@ -1,19 +1,30 @@
-# KMS Key (Optional, for encryption)
+# Locals for Deployment Logic
+locals {
+  is_single_az_instance  = var.deployment_type == "single-az-instance"
+  is_multi_az_instance   = var.deployment_type == "multi-az-instance"
+  is_multi_az_db_cluster = var.deployment_type == "multi-az-db-cluster"
+}
+
+# Data
+data "aws_vpc" "selected" {
+  id = var.vpc_id
+}
+
 data "aws_caller_identity" "current" {}
 
-resource "aws_kms_key" "main" {
+# KMS Key for Encryption
+resource "aws_kms_key" "rds_key" {
   count = var.create_kms_key ? 1 : 0
 
-  description             = var.kms_key_description
+  description             = "KMS key for RDS encryption"
   enable_key_rotation     = true
-  deletion_window_in_days = var.kms_deletion_window_in_days
+  deletion_window_in_days = 10
 
-  # Inline JSON policy
+  # Inline policy with root and RDS permissions
   policy = jsonencode({
     Version = "2012-10-17"
     Id      = "rds-kms-policy"
     Statement = [
-      # Allow the account root full access
       {
         Sid      = "EnableRootPermissions"
         Effect   = "Allow"
@@ -23,8 +34,6 @@ resource "aws_kms_key" "main" {
         Action   = "kms:*"
         Resource = "*"
       },
-
-      # Allow RDS to use the key
       {
         Sid      = "AllowRDSUse"
         Effect   = "Allow"
@@ -43,139 +52,142 @@ resource "aws_kms_key" "main" {
   })
 
   tags = merge(var.tags, {
-    Name = "${var.name_prefix}-rds-kms-key"
+    Name = "${var.name_prefix}-kms-key"
   })
 }
 
-# Security Group for RDS
-resource "aws_security_group" "rds_sg" {
-  name        = "${var.name_prefix}-rds-sg"
-  description = "Security group for RDS instance"
-  vpc_id      = var.vpc_id
-
-  ingress {
-    from_port       = var.port
-    to_port         = var.port
-    protocol        = "tcp"
-    security_groups = var.allowed_sg_ids
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = merge(var.tags, {
-    Name = "${var.name_prefix}-rds-sg"
-  })
+resource "aws_kms_alias" "rds_key_alias" {
+  count         = var.create_kms_key ? 1 : 0
+  name          = "alias/${var.name_prefix}-rds-key"
+  target_key_id = aws_kms_key.rds_key[0].id
 }
 
-# DB Subnet Group
+# Subnet Group
 resource "aws_db_subnet_group" "main" {
-  name        = var.db_subnet_group_name
+  name        = "${var.name_prefix}-subnet-group"
   subnet_ids  = var.subnet_ids
   description = "RDS Subnet Group"
 
   tags = merge(var.tags, {
-    Name = var.db_subnet_group_name
+    Name = "${var.name_prefix}-subnet-group"
   })
 }
 
-# DB Parameter Group
-resource "aws_db_parameter_group" "main" {
-  name        = var.parameter_group_name
-  family      = var.db_family
-  description = "RDS Parameter Group"
+# Parameter Groups
+resource "aws_db_parameter_group" "db_params" {
+  name_prefix = "${var.name_prefix}-db-pg-"
+  family      = var.db_parameter_group_family
+  description = "RDS DB Parameter Group"
+
+  dynamic "parameter" {
+    for_each = var.additional_db_parameters
+    content {
+      name  = parameter.key
+      value = parameter.value
+    }
+  }
 
   tags = merge(var.tags, {
-    Name = var.parameter_group_name
+    Name = "${var.name_prefix}-db-parameter-group"
   })
 }
 
-# Primary RDS Instance
-resource "aws_db_instance" "main" {
-  identifier                 = var.db_identifier
-  db_name                    = var.db_name
-  engine                     = var.db_engine
-  engine_version             = var.db_engine_version
-  instance_class             = var.db_instance_class
-  storage_type               = var.storage_type
-  allocated_storage          = var.allocated_storage
-  multi_az                   = var.multi_az
-  username                   = var.db_username
-  manage_master_user_password = var.manage_master_user_password
-  master_user_secret_kms_key_id = var.manage_master_user_password && var.create_kms_key ? aws_kms_key.main[0].id : null
+resource "aws_rds_cluster_parameter_group" "cluster_params" {
+  count       = local.is_multi_az_db_cluster ? 1 : 0
+  name_prefix = "${var.name_prefix}-cluster-pg-"
+  family      = var.db_cluster_parameter_group_family
+  description = "RDS Cluster Parameter Group"
 
+  dynamic "parameter" {
+    for_each = var.additional_cluster_parameters
+    content {
+      name  = parameter.key
+      value = parameter.value
+    }
+  }
+
+  tags = merge(var.tags, {
+    Name = "${var.name_prefix}-cluster-parameter-group"
+  })
+}
+
+# Standard RDS Instance (Single-AZ or Multi-AZ)
+resource "aws_db_instance" "instance" {
+  count = local.is_single_az_instance || local.is_multi_az_instance ? 1 : 0
+
+  identifier                 = var.name_prefix
+  db_name                    = var.database_name
+  engine                     = var.engine_type
+  engine_version             = var.engine_version
+  instance_class             = var.instance_class
+  allocated_storage          = var.allocated_storage
+  storage_type               = var.storage_type
+  multi_az                   = local.is_multi_az_instance
   publicly_accessible        = var.publicly_accessible
-  availability_zone          = var.availability_zone
   vpc_security_group_ids     = [aws_security_group.rds_sg.id]
   db_subnet_group_name       = aws_db_subnet_group.main.name
-  parameter_group_name       = aws_db_parameter_group.main.name
-  ca_cert_identifier         = var.ca_cert_identifier
+  parameter_group_name       = aws_db_parameter_group.db_params.name
+  username                   = var.master_username
+  password                   = var.master_password
   storage_encrypted          = var.storage_encrypted
-  kms_key_id                 = var.storage_encrypted && var.create_kms_key ? aws_kms_key.main[0].arn : null
-  auto_minor_version_upgrade = var.auto_minor_version_upgrade
+  kms_key_id                 = var.storage_encrypted && var.create_kms_key ? aws_kms_key.rds_key[0].arn : null
   backup_retention_period    = var.backup_retention_period
   skip_final_snapshot        = var.skip_final_snapshot
-
-  iam_database_authentication_enabled = var.iam_auth_enabled
-  performance_insights_enabled           = var.performance_insights_enabled
-  performance_insights_retention_period  = var.performance_insights_enabled ? var.performance_insights_retention_period : null
-
-  monitoring_interval = var.enable_monitoring ? 60 : 0
-  monitoring_role_arn = var.monitoring_role_arn
+  auto_minor_version_upgrade = var.auto_minor_version_upgrade
+  apply_immediately          = var.apply_immediately
+  performance_insights_enabled          = var.performance_insights_enabled
+  performance_insights_retention_period = var.performance_insights_enabled ? var.performance_insights_retention_period : null
+  performance_insights_kms_key_id       = var.performance_insights_enabled && var.create_kms_key ? aws_kms_key.rds_key[0].arn : null
 
   tags = merge(var.tags, {
-    Name = var.db_identifier
+    Name = "${var.name_prefix}-instance"
   })
 }
 
-# Optional Read Replica
-resource "aws_db_instance" "replica" {
-  count               = var.create_read_replica ? 1 : 0
-  replicate_source_db = aws_db_instance.main.id
-  instance_class      = var.replica_instance_class
-  publicly_accessible = false
-  multi_az            = false
+# Multi-AZ Cluster (Aurora or Native)
+resource "aws_rds_cluster" "multi_az_cluster" {
+  count = local.is_multi_az_db_cluster ? 1 : 0
+
+  cluster_identifier              = "${var.name_prefix}-cluster"
+  database_name                   = var.database_name
+  db_cluster_instance_class       = var.instance_class
+  master_username                 = var.master_username
+  master_password                 = var.master_password
+  engine                          = var.engine_type
+  engine_version                  = var.engine_version
+  db_subnet_group_name            = aws_db_subnet_group.main.name
+  vpc_security_group_ids          = [aws_security_group.rds_sg.id]
+  storage_encrypted               = true
+  kms_key_id                      = var.create_kms_key ? aws_kms_key.rds_key[0].arn : null
+  skip_final_snapshot             = var.skip_final_snapshot
+  backup_retention_period         = var.backup_retention_period
+  db_cluster_parameter_group_name = aws_rds_cluster_parameter_group.cluster_params[0].name
+  apply_immediately               = var.apply_immediately
+  # Only set allocated_storage for non-Aurora engines
+  allocated_storage = contains(["aurora", "aurora-mysql", "aurora-postgresql"], var.engine_type) ? null : var.allocated_storage
+  storage_type                    = var.storage_type
+
+  performance_insights_enabled          = var.performance_insights_enabled
+  performance_insights_retention_period = var.performance_insights_enabled ? var.performance_insights_retention_period : null
+  performance_insights_kms_key_id       = var.performance_insights_enabled && var.create_kms_key ? aws_kms_key.rds_key[0].arn : null
 
   tags = merge(var.tags, {
-    Name = "${var.db_identifier}-replica"
+    Name = "${var.name_prefix}-multi-az-cluster"
   })
 }
 
-# Optional Aurora Cluster
-resource "aws_rds_cluster" "aurora" {
-  count                 = var.create_aurora ? 1 : 0
-  cluster_identifier    = "${var.db_identifier}-cluster"
-  engine                = "aurora-postgresql"
-  engine_version        = var.db_engine_version
-  master_username       = var.db_username
-  master_password       = var.password
-  database_name         = var.db_name
-  backup_retention_period = var.backup_retention_period
-  storage_encrypted     = true
-  kms_key_id            = var.create_kms_key ? aws_kms_key.main[0].arn : null
-  db_subnet_group_name  = aws_db_subnet_group.main.name
-  vpc_security_group_ids = [aws_security_group.rds_sg.id]
-  deletion_protection   = var.deletion_protection
-  port                  = var.port
+resource "aws_rds_cluster_instance" "multi_az_cluster_instances" {
+  count              = local.is_multi_az_db_cluster ? var.db_cluster_size : 0
+  cluster_identifier = aws_rds_cluster.multi_az_cluster[0].id
+  identifier         = "${var.name_prefix}-instance-${count.index}"
+  instance_class     = var.instance_class
+  engine             = var.engine_type
+
+  performance_insights_enabled          = var.performance_insights_enabled
+  performance_insights_retention_period = var.performance_insights_enabled ? var.performance_insights_retention_period : null
+  performance_insights_kms_key_id       = var.performance_insights_enabled && var.create_kms_key ? aws_kms_key.rds_key[0].arn : null
 
   tags = merge(var.tags, {
-    Name = "${var.db_identifier}-aurora"
-  })
-}
-
-resource "aws_rds_cluster_instance" "aurora_instance" {
-  count               = var.create_aurora ? var.aurora_instance_count : 0
-  identifier          = "${var.db_identifier}-instance-${count.index}"
-  cluster_identifier  = aws_rds_cluster.aurora[0].id
-  instance_class      = var.db_instance_class
-  engine              = "aurora-postgresql"
-  publicly_accessible = var.publicly_accessible
-
-  tags = merge(var.tags, {
-    Name = "${var.db_identifier}-aurora-instance-${count.index}"
+    Name = "${var.name_prefix}-cluster-instance-${count.index}"
   })
 }

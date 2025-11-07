@@ -1,49 +1,34 @@
 output "rds_instance_id" {
-  description = "ID of the RDS instance"
-  value       = aws_db_instance.main.id
+  description = "The RDS instance identifier"
+  value       = try(aws_db_instance.instance[0].id, null)
 }
 
-output "rds_endpoint" {
-  description = "RDS endpoint"
-  value       = aws_db_instance.main.endpoint
+output "rds_instance_endpoint" {
+  description = "RDS instance endpoint"
+  value       = try(aws_db_instance.instance[0].endpoint, null)
 }
 
-output "rds_port" {
-  description = "RDS port"
-  value       = aws_db_instance.main.port
+output "rds_instance_arn" {
+  description = "ARN of the RDS instance"
+  value       = try(aws_db_instance.instance[0].arn, null)
+}
+
+output "rds_cluster_id" {
+  description = "The RDS cluster identifier"
+  value       = try(aws_rds_cluster.multi_az_cluster[0].id, null)
+}
+
+output "rds_cluster_endpoint" {
+  description = "RDS cluster endpoint"
+  value       = try(aws_rds_cluster.multi_az_cluster[0].endpoint, null)
 }
 
 output "rds_security_group_id" {
-  description = "RDS security group ID"
+  description = "The security group ID associated with the RDS"
   value       = aws_security_group.rds_sg.id
 }
 
-output "db_subnet_group" {
-  description = "RDS Subnet Group name"
-  value       = aws_db_subnet_group.main.name
-}
-
-output "parameter_group_name" {
-  description = "RDS Parameter Group name"
-  value       = aws_db_parameter_group.main.name
-}
-
-output "kms_key_arn" {
-  description = "KMS Key ARN used for RDS (if created)"
-  value       = try(aws_kms_key.main[0].arn, null)
-}
-
-output "read_replica_id" {
-  description = "Read replica ID (if created)"
-  value       = try(aws_db_instance.replica[0].id, null)
-}
-
-output "aurora_cluster_id" {
-  description = "Aurora cluster ID (if created)"
-  value       = try(aws_rds_cluster.aurora[0].id, null)
-}
-
-output "aurora_endpoints" {
-  description = "Aurora endpoints for instances"
-  value       = try([for inst in aws_rds_cluster_instance.aurora_instance : inst.endpoint], null)
+output "rds_kms_key_arn" {
+  description = "ARN of the KMS key used for encryption"
+  value       = try(aws_kms_key.rds_key[0].arn, null)
 }

@@ -60,3 +60,30 @@ data "aws_iam_policy_document" "ecs_task" {
     }
   }
 }
+
+# EC2 Roles
+
+resource "aws_iam_role" "ecs_instance" {
+  name               = "${var.name}-ecs-instance-role"
+  assume_role_policy = data.aws_iam_policy_document.ecs_instance.json
+}
+
+data "aws_iam_policy_document" "ecs_instance" {
+  statement {
+    actions = ["sts:AssumeRole"]
+    principals {
+      type        = "Service"
+      identifiers = ["ec2.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role_policy_attachment" "ecs_instance" {
+  role       = aws_iam_role.ecs_instance.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role"
+}
+
+resource "aws_iam_instance_profile" "ecs" {
+  name = "${var.name}-ecs-instance-profile"
+  role = aws_iam_role.ecs_instance.name
+}

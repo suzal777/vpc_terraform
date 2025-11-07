@@ -20,10 +20,3 @@ variable "create_nat_instance" {
   type    = bool
   default = false
 }
-
-variable "iam_instance_profile" {}
-
-variable "nat_instance_sg_ids" {
-  description = "List of security group IDs for NAT instances"
-  type        = list(string)
-}

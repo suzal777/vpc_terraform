@@ -3,7 +3,7 @@ resource "aws_lb" "main" {
   name               = "${var.name}-alb"
   load_balancer_type = "application"
   subnets            = var.subnet_ids
-  security_groups    = var.sg_ids.alb_sg
+  security_groups     = [aws_security_group.alb_sg.id]
   tags               = var.tags
 }
 
